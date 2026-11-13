@@ -4,70 +4,59 @@
  */
 
 import PropTypes from "prop-types";
-import { Component } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import Overridable from "react-overridable";
 import { Input } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import { i18next } from "@translations/i18next";
 
-class SearchBar extends Component {
-  constructor(props) {
-    super(props);
-    this.updateQueryString = props.updateQueryString;
-    this.state = {
-      currentValue: props.queryString || "",
-    };
-  }
+function SearchBar({
+  updateQueryString,
+  queryString = "",
+  actionProps = null,
+  autofocus = false,
+  executeSearch: executeSearchProp = null,
+  onBtnSearchClick: onBtnSearchClickProp = null,
+  onInputChange: onInputChangeProp = null,
+  onKeyPress: onKeyPressProp = null,
+  overridableId = "",
+  placeholder = "",
+  uiProps = null,
+}) {
+  const [currentValue, setCurrentValue] = useState(queryString || "");
 
-  onInputChange = (queryString) => {
-    this.setState({
-      currentValue: queryString,
-    });
+  const handleInputChange = (newQueryString) => {
+    setCurrentValue(newQueryString);
   };
 
-  executeSearch = () => {
-    const { currentValue } = this.state;
-    this.updateQueryString(currentValue);
+  const handleExecuteSearch = () => {
+    updateQueryString(currentValue);
   };
 
-  onBtnSearchClick = () => {
-    this.executeSearch();
+  const handleBtnSearchClick = () => {
+    handleExecuteSearch();
   };
 
-  onKeyPress = (event) => {
+  const handleKeyPress = (event) => {
     if (event.key === "Enter") {
-      this.executeSearch();
+      handleExecuteSearch();
     }
   };
 
-  render() {
-    const {
-      actionProps = null,
-      autofocus = false,
-      executeSearch = null,
-      onBtnSearchClick = null,
-      onInputChange = null,
-      onKeyPress = null,
-      overridableId = "",
-      placeholder = "",
-      uiProps = null,
-    } = this.props;
-    const { currentValue } = this.state;
-    return (
-      <Element
-        actionProps={actionProps}
-        autofocus={autofocus}
-        executeSearch={executeSearch || this.executeSearch}
-        onBtnSearchClick={onBtnSearchClick || this.onBtnSearchClick}
-        onInputChange={onInputChange || this.onInputChange}
-        onKeyPress={onKeyPress || this.onKeyPress}
-        overridableId={overridableId}
-        placeholder={placeholder}
-        queryString={currentValue}
-        uiProps={uiProps}
-      />
-    );
-  }
+  return (
+    <Element
+      actionProps={actionProps}
+      autofocus={autofocus}
+      executeSearch={executeSearchProp || handleExecuteSearch}
+      onBtnSearchClick={onBtnSearchClickProp || handleBtnSearchClick}
+      onInputChange={onInputChangeProp || handleInputChange}
+      onKeyPress={onKeyPressProp || handleKeyPress}
+      overridableId={overridableId}
+      placeholder={placeholder}
+      queryString={currentValue}
+      uiProps={uiProps}
+    />
+  );
 }
 
 SearchBar.propTypes = {
@@ -96,59 +85,57 @@ SearchBarUncontrolled.propTypes = {
   queryString: PropTypes.string,
 };
 
-class Element extends Component {
-  componentDidMount() {
-    const { autofocus } = this.props;
-    if (autofocus && this.focusInput) {
-      this.focusInput.focus();
+function Element({
+  autofocus = false,
+  actionProps = null,
+  onBtnSearchClick = null,
+  onInputChange = null,
+  onKeyPress = null,
+  overridableId = "",
+  placeholder = "",
+  queryString = "",
+  uiProps = null,
+}) {
+  const { buildUID } = useContext(AppContext);
+  const focusInputRef = useRef(null);
+
+  useEffect(() => {
+    if (autofocus && focusInputRef.current) {
+      focusInputRef.current.focus();
     }
-  }
+  }, [autofocus]);
 
-  render() {
-    const {
-      actionProps = null,
-      onBtnSearchClick = null,
-      onInputChange = null,
-      onKeyPress = null,
-      overridableId = "",
-      placeholder = "",
-      queryString = "",
-      uiProps = null,
-    } = this.props;
-    const { buildUID } = this.context;
-
-    return (
-      <Overridable
-        id={buildUID("SearchBar.element", overridableId)}
-        queryString={queryString}
-        onBtnSearchClick={onBtnSearchClick}
-        onInputChange={onInputChange}
+  return (
+    <Overridable
+      id={buildUID("SearchBar.element", overridableId)}
+      queryString={queryString}
+      onBtnSearchClick={onBtnSearchClick}
+      onInputChange={onInputChange}
+      onKeyPress={onKeyPress}
+      placeholder={placeholder}
+      actionProps={actionProps}
+      uiProps={uiProps}
+    >
+      <Input
+        action={{
+          content: i18next.t("Search"),
+          onClick: onBtnSearchClick,
+          ...actionProps,
+        }}
+        fluid
+        {...uiProps}
+        placeholder={placeholder || i18next.t("Type something")}
+        onChange={(_, { value }) => {
+          onInputChange(value);
+        }}
+        value={queryString}
         onKeyPress={onKeyPress}
-        placeholder={placeholder}
-        actionProps={actionProps}
-        uiProps={uiProps}
-      >
-        <Input
-          action={{
-            content: i18next.t("Search"),
-            onClick: onBtnSearchClick,
-            ...actionProps,
-          }}
-          fluid
-          {...uiProps}
-          placeholder={placeholder || i18next.t("Type something")}
-          onChange={(_, { value }) => {
-            onInputChange(value);
-          }}
-          value={queryString}
-          onKeyPress={onKeyPress}
-          ref={(input) => {
-            this.focusInput = input;
-          }}
-        />
-      </Overridable>
-    );
-  }
+        ref={(input) => {
+          focusInputRef.current = input;
+        }}
+      />
+    </Overridable>
+  );
 }
 
 Element.propTypes = {
@@ -162,7 +149,5 @@ Element.propTypes = {
   queryString: PropTypes.string,
   uiProps: PropTypes.object,
 };
-
-Element.contextType = AppContext;
 
 export default Overridable.component("SearchBar", SearchBarUncontrolled);

@@ -4,39 +4,32 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext } from "react";
 import Overridable from "react-overridable";
 import { Icon, Menu } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import { ShouldRender } from "../ShouldRender";
 
-class LayoutSwitcher extends Component {
-  constructor(props) {
-    super(props);
-    this.updateLayout = props.updateLayout;
-  }
-
-  onLayoutChange = (layoutName) => {
-    this.updateLayout(layoutName);
+function LayoutSwitcher({
+  updateLayout,
+  currentLayout,
+  loading,
+  totalResults,
+  overridableId,
+}) {
+  const onLayoutChange = (layoutName) => {
+    updateLayout(layoutName);
   };
 
-  render() {
-    const {
-      currentLayout = null,
-      loading,
-      totalResults,
-      overridableId = "",
-    } = this.props;
-    return (
-      <ShouldRender condition={currentLayout !== null && !loading && totalResults > 0}>
-        <Element
-          currentLayout={currentLayout}
-          onLayoutChange={this.onLayoutChange}
-          overridableId={overridableId}
-        />
-      </ShouldRender>
-    );
-  }
+  return (
+    <ShouldRender condition={currentLayout !== null && !loading && totalResults > 0}>
+      <Element
+        currentLayout={currentLayout}
+        onLayoutChange={onLayoutChange}
+        overridableId={overridableId}
+      />
+    </ShouldRender>
+  );
 }
 
 LayoutSwitcher.propTypes = {

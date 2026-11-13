@@ -5,43 +5,36 @@
 
 import _isEmpty from "lodash/isEmpty";
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext } from "react";
 import Overridable from "react-overridable";
 import { Button, Header, Icon, Segment } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import { ShouldRender } from "../ShouldRender";
 import { i18next } from "@translations/i18next";
 
-class EmptyResults extends Component {
-  constructor(props) {
-    super(props);
-    this.resetQuery = props.resetQuery;
-  }
-
-  render() {
-    const {
-      loading,
-      totalResults,
-      error,
-      queryString = "",
-      extraContent = null,
-      overridableId = "",
-      userSelectionFilters,
-      ...props
-    } = this.props;
-    return (
-      <ShouldRender condition={!loading && _isEmpty(error) && totalResults === 0}>
-        <Element
-          {...props}
-          queryString={queryString}
-          resetQuery={this.resetQuery}
-          extraContent={extraContent}
-          userSelectionFilters={userSelectionFilters}
-          overridableId={overridableId}
-        />
-      </ShouldRender>
-    );
-  }
+function EmptyResults({
+  resetQuery,
+  loading,
+  totalResults,
+  error,
+  queryString,
+  extraContent,
+  overridableId,
+  userSelectionFilters,
+  ...props
+}) {
+  return (
+    <ShouldRender condition={!loading && _isEmpty(error) && totalResults === 0}>
+      <Element
+        {...props}
+        queryString={queryString}
+        resetQuery={resetQuery}
+        extraContent={extraContent}
+        userSelectionFilters={userSelectionFilters}
+        overridableId={overridableId}
+      />
+    </ShouldRender>
+  );
 }
 
 EmptyResults.propTypes = {

@@ -5,51 +5,45 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useMemo } from "react";
 import Overridable from "react-overridable";
 import { Dropdown } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import { ShouldRender } from "../ShouldRender";
 import { i18next } from "@translations/i18next";
 
-class SortBy extends Component {
-  constructor(props) {
-    super(props);
-    this.options = props.values;
-    this.updateQuerySortBy = props.updateQuerySortBy;
-  }
+function SortBy({
+  values,
+  updateQuerySortBy,
+  currentSortBy,
+  loading,
+  totalResults,
+  label = (cmp) => cmp,
+  overridableId = "",
+  ariaLabel,
+  selectOnNavigation = false,
+}) {
+  const options = useMemo(() => values, [values]);
 
-  onChange = (value) => {
-    const { currentSortBy } = this.props;
+  const onChange = (value) => {
     if (value === currentSortBy) return;
-    this.updateQuerySortBy(value);
+    updateQuerySortBy(value);
   };
 
-  render() {
-    const {
-      currentSortBy = null,
-      loading,
-      totalResults,
-      label = (cmp) => cmp,
-      overridableId = "",
-      ariaLabel = i18next.t("Sort Results By"),
-      selectOnNavigation = false,
-    } = this.props;
-    return (
-      <ShouldRender condition={currentSortBy !== null && !loading && totalResults > 0}>
-        {label(
-          <Element
-            currentSortBy={currentSortBy}
-            options={this.options}
-            onValueChange={this.onChange}
-            overridableId={overridableId}
-            ariaLabel={ariaLabel}
-            selectOnNavigation={selectOnNavigation}
-          />
-        )}
-      </ShouldRender>
-    );
-  }
+  return (
+    <ShouldRender condition={currentSortBy !== null && !loading && totalResults > 0}>
+      {label(
+        <Element
+          currentSortBy={currentSortBy}
+          options={options}
+          onValueChange={onChange}
+          overridableId={overridableId}
+          ariaLabel={ariaLabel}
+          selectOnNavigation={selectOnNavigation}
+        />
+      )}
+    </ShouldRender>
+  );
 }
 
 SortBy.propTypes = {

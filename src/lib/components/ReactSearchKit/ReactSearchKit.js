@@ -4,7 +4,7 @@
  */
 
 import PropTypes from "prop-types";
-import { Component } from "react";
+import { useMemo, useRef } from "react";
 import Overridable from "react-overridable";
 import { Provider } from "react-redux";
 import { UrlHandlerApi } from "../../api";
@@ -13,65 +13,67 @@ import { buildUID } from "../../util";
 import { Bootstrap } from "../Bootstrap";
 import { AppContext } from "./AppContext";
 
-export class ReactSearchKit extends Component {
-  constructor(props) {
-    super(props);
-
-    const { searchOnInit = true } = props;
-    const urlHandlerApi = props.urlHandlerApi ?? {
+export function ReactSearchKit({
+  urlHandlerApi,
+  searchApi,
+  suggestionApi = null,
+  initialQueryState = {},
+  defaultSortingOnEmptyQueryString = {},
+  appName = "",
+  eventListenerEnabled = false,
+  searchOnInit = true,
+  children,
+  overridableId = "",
+}) {
+  const storeRef = useRef(null);
+  if (storeRef.current === null) {
+    const urlHandler = urlHandlerApi ?? {
       enabled: true,
       overrideConfig: {},
       customHandler: null,
     };
 
     const appConfig = {
-      searchApi: props.searchApi,
-      suggestionApi: props.suggestionApi ?? null,
-      urlHandlerApi: urlHandlerApi.enabled
-        ? urlHandlerApi.customHandler || new UrlHandlerApi(urlHandlerApi.overrideConfig)
+      searchApi,
+      suggestionApi,
+      urlHandlerApi: urlHandler.enabled
+        ? urlHandler.customHandler || new UrlHandlerApi(urlHandler.overrideConfig)
         : null,
       searchOnInit,
-      initialQueryState: props.initialQueryState ?? {},
-      defaultSortingOnEmptyQueryString: props.defaultSortingOnEmptyQueryString ?? {},
+      initialQueryState,
+      defaultSortingOnEmptyQueryString,
     };
 
-    this.store = createStoreWithConfig(appConfig);
-    this.appName = props.appName ?? "";
-    this.eventListenerEnabled = props.eventListenerEnabled ?? false;
-    this.componentIndex = 0;
+    storeRef.current = createStoreWithConfig(appConfig);
   }
-  render() {
-    const {
-      appName = "",
-      children,
-      eventListenerEnabled = false,
-      overridableId = "",
-      searchOnInit = true,
-    } = this.props;
 
-    const context = {
+  const componentIndexRef = useRef(0);
+
+  const context = useMemo(
+    () => ({
       appName,
       buildUID: (element, overrideId) => buildUID(element, overrideId, appName),
       /* This is an internal function that will be used to create id for the checkboxes and labels, ensuring that
           they are unique */
-      nextComponentIndex: () => `${this.appName}_${this.componentIndex++}`,
-    };
+      nextComponentIndex: () => `${appName}_${componentIndexRef.current++}`,
+    }),
+    [appName]
+  );
 
-    const _overridableId = buildUID("ReactSearchKit.children", overridableId, appName);
+  const _overridableId = buildUID("ReactSearchKit.children", overridableId, appName);
 
-    return (
-      <AppContext.Provider value={context}>
-        <Provider store={this.store}>
-          <Bootstrap
-            searchOnInit={searchOnInit}
-            eventListenerEnabled={eventListenerEnabled}
-          >
-            <Overridable id={_overridableId}>{children}</Overridable>
-          </Bootstrap>
-        </Provider>
-      </AppContext.Provider>
-    );
-  }
+  return (
+    <AppContext.Provider value={context}>
+      <Provider store={storeRef.current}>
+        <Bootstrap
+          searchOnInit={searchOnInit}
+          eventListenerEnabled={eventListenerEnabled}
+        >
+          <Overridable id={_overridableId}>{children}</Overridable>
+        </Bootstrap>
+      </Provider>
+    </AppContext.Provider>
+  );
 }
 
 ReactSearchKit.propTypes = {
@@ -109,7 +111,5 @@ ReactSearchKit.propTypes = {
   }),
   children: PropTypes.node.isRequired,
 };
-
-ReactSearchKit.contextType = AppContext;
 
 export default Overridable.component("ReactSearchKit", ReactSearchKit);

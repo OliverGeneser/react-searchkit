@@ -4,7 +4,7 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useState } from "react";
 import Overridable from "react-overridable";
 import { Popup } from "semantic-ui-react";
 import { scaleBand, scaleLinear } from "@visx/scale";
@@ -14,79 +14,71 @@ import { AppContext } from "../ReactSearchKit";
 
 const MAX_BAR_WIDTH = 30;
 
-class RangeHistogram extends Component {
-  state = {
-    hoveredYear: null,
-    tooltip: null,
-  };
+function RangeHistogram({
+  parentWidth,
+  data,
+  range,
+  height,
+  onBarClick,
+  overridableId = "",
+}) {
+  const [hoveredYear, setHoveredYear] = useState(null);
+  const [tooltip, setTooltip] = useState(null);
 
-  handleBarHover = (event, datum) => {
+  const handleBarHover = (event, datum) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    this.setState({
-      hoveredYear: datum.year,
-      tooltip: {
-        year: datum.year,
-        count: datum.count,
-        x: rect.left + rect.width / 2,
-        y: rect.top,
-      },
+    setHoveredYear(datum.year);
+    setTooltip({
+      year: datum.year,
+      count: datum.count,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
     });
   };
 
-  handleBarLeave = () => {
-    this.setState({ hoveredYear: null, tooltip: null });
+  const handleBarLeave = () => {
+    setHoveredYear(null);
+    setTooltip(null);
   };
 
-  buildScales = (data, width, height) => {
+  const buildScales = (chartData, width, chartHeight) => {
     const xScale = scaleBand({
-      domain: data.map((d) => d.year),
+      domain: chartData.map((d) => d.year),
       range: [0, width],
       padding: 0.1,
     });
 
     const yScale = scaleLinear({
-      domain: [0, Math.max(...data.map((d) => d.count))],
-      range: [height, 0],
+      domain: [0, Math.max(...chartData.map((d) => d.count))],
+      range: [chartHeight, 0],
       nice: true,
     });
 
     return { xScale, yScale };
   };
 
-  render() {
-    const {
-      parentWidth = null,
-      data,
-      range,
-      height,
-      onBarClick,
-      overridableId = "",
-    } = this.props;
-    const { hoveredYear, tooltip } = this.state;
-
-    if (!parentWidth || parentWidth <= 0 || data.length === 0) {
-      return null;
-    }
-
-    const { xScale, yScale } = this.buildScales(data, parentWidth, height);
-
-    return (
-      <RangeHistogramElement
-        data={data}
-        range={range}
-        width={parentWidth}
-        height={height}
-        xScale={xScale}
-        yScale={yScale}
-        hoveredYear={hoveredYear}
-        tooltip={tooltip}
-        onBarClick={onBarClick}
-        onBarHover={this.handleBarHover}
-        onBarLeave={this.handleBarLeave}
-        overridableId={overridableId}
-      />
-    );
+  if (!parentWidth || parentWidth <= 0 || data.length === 0) {
+    return null;
   }
+
+  const { xScale, yScale } = buildScales(data, parentWidth, height);
+
+  return (
+    <RangeHistogramElement
+      data={data}
+      range={range}
+      width={parentWidth}
+      height={height}
+      xScale={xScale}
+      yScale={yScale}
+      hoveredYear={hoveredYear}
+      tooltip={tooltip}
+      onBarClick={onBarClick}
+      onBarHover={handleBarHover}
+      onBarLeave={handleBarLeave}
+      overridableId={overridableId}
+    />
+  );
 }
 
 RangeHistogram.propTypes = {

@@ -5,72 +5,68 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useMemo } from "react";
 import Overridable from "react-overridable";
 import { Dropdown } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import { ShouldRender } from "../ShouldRender";
 import { i18next } from "@translations/i18next";
 
-class Sort extends Component {
-  constructor(props) {
-    super(props);
-    this.options = props.values;
-    this.updateQuerySorting = props.updateQuerySorting;
-
-    this.options.forEach(
-      (option) =>
-        (option["value"] = this._computeValue(option.sortBy, option.sortOrder))
-    );
-  }
-
-  _computeValue = (sortBy, sortOrder) => {
+function Sort({
+  values,
+  updateQuerySorting,
+  currentSortBy,
+  currentSortOrder,
+  loading,
+  totalResults,
+  label = (cmp) => cmp,
+  overridableId = "",
+  sortOrderDisabled = false,
+  ariaLabel,
+  selectOnNavigation = false,
+}) {
+  const _computeValue = (sortBy, sortOrder) => {
     return sortOrder ? `${sortBy}-${sortOrder}` : sortBy;
   };
 
-  onChange = (value) => {
-    const { currentSortBy, currentSortOrder } = this.props;
-    if (value === this._computeValue(currentSortBy, currentSortOrder)) return;
-    const selected = this.options.find((option) => option.value === value);
-    this.updateQuerySorting(selected.sortBy, selected.sortOrder);
+  const options = useMemo(
+    () =>
+      values.map((option) => ({
+        ...option,
+        value: _computeValue(option.sortBy, option.sortOrder),
+      })),
+    [values]
+  );
+
+  const onChange = (value) => {
+    if (value === _computeValue(currentSortBy, currentSortOrder)) return;
+    const selected = options.find((option) => option.value === value);
+    updateQuerySorting(selected.sortBy, selected.sortOrder);
   };
 
-  render() {
-    const {
-      currentSortBy = null,
-      currentSortOrder = null,
-      loading,
-      totalResults,
-      label = (cmp) => cmp,
-      overridableId = "",
-      sortOrderDisabled = false,
-      ariaLabel = i18next.t("Sort"),
-      selectOnNavigation = false,
-    } = this.props;
-    return (
-      <ShouldRender
-        condition={
-          currentSortBy !== null &&
-          (sortOrderDisabled || currentSortBy !== null) &&
-          !loading &&
-          totalResults > 0
-        }
-      >
-        {label(
-          <Element
-            currentSortBy={currentSortBy}
-            currentSortOrder={currentSortOrder}
-            options={this.options}
-            onValueChange={this.onChange}
-            computeValue={this._computeValue}
-            overridableId={overridableId}
-            ariaLabel={ariaLabel}
-            selectOnNavigation={selectOnNavigation}
-          />
-        )}
-      </ShouldRender>
-    );
-  }
+  return (
+    <ShouldRender
+      condition={
+        currentSortBy !== null &&
+        (sortOrderDisabled || currentSortBy !== null) &&
+        !loading &&
+        totalResults > 0
+      }
+    >
+      {label(
+        <Element
+          currentSortBy={currentSortBy}
+          currentSortOrder={currentSortOrder}
+          options={options}
+          onValueChange={onChange}
+          computeValue={_computeValue}
+          overridableId={overridableId}
+          ariaLabel={ariaLabel}
+          selectOnNavigation={selectOnNavigation}
+        />
+      )}
+    </ShouldRender>
+  );
 }
 
 Sort.propTypes = {

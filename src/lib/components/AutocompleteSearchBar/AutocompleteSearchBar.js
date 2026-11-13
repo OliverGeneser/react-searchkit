@@ -10,67 +10,84 @@
 
 import _ from "lodash";
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import Overridable from "react-overridable";
 import { Input, Button } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import "./AutocompleteSearchBar.scss";
 import { i18next } from "@translations/i18next";
 
-class AutocompleteSearchBar extends Component {
-  constructor(props) {
-    super(props);
-    this.updateQueryString = this.props.updateQueryString;
-    this.updateSuggestions = this.props.debounce
-      ? _.debounce(this.props.updateSuggestions, this.props.debounceTime, {
-          leading: true,
-        })
-      : this.props.updateSuggestions;
-    this.clearSuggestions = this.props.clearSuggestions;
-    const { minCharsToAutocomplete = 3 } = props;
-    this.minCharsToAutocomplete = minCharsToAutocomplete;
-    this.state = {
-      currentValue: this.props.queryString || "",
-    };
-    this.handleAutocompleteChange =
-      props.handleAutocompleteChange || this._handleAutocompleteChange;
-  }
+function AutocompleteSearchBar({
+  updateQueryString,
+  debounce,
+  updateSuggestions,
+  debounceTime,
+  clearSuggestions,
+  queryString = "",
+  handleAutocompleteChange: handleAutocompleteChangeProp,
+  minCharsToAutocomplete = 3,
+  placeholder = "",
+  suggestions,
+  overridableId = "",
+}) {
+  const [currentValue, setCurrentValue] = useState(queryString || "");
 
-  _handleAutocompleteChange = (suggestionString) => {
-    if (suggestionString.length >= this.minCharsToAutocomplete) {
-      this.updateSuggestions(suggestionString);
+  const debouncedUpdateSuggestions = useMemo(
+    () =>
+      debounce
+        ? _.debounce(updateSuggestions, debounceTime, {
+            leading: true,
+          })
+        : updateSuggestions,
+    [debounce, updateSuggestions, debounceTime]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (
+        debouncedUpdateSuggestions &&
+        typeof debouncedUpdateSuggestions.cancel === "function"
+      ) {
+        debouncedUpdateSuggestions.cancel();
+      }
+    };
+  }, [debouncedUpdateSuggestions]);
+
+  const _handleAutocompleteChange = (suggestionString) => {
+    if (suggestionString.length >= minCharsToAutocomplete) {
+      debouncedUpdateSuggestions(suggestionString);
     }
   };
 
-  onInputChange = async (queryString) => {
-    await this.setState({
-      currentValue: queryString,
-    });
+  const handleAutocompleteChange =
+    handleAutocompleteChangeProp || _handleAutocompleteChange;
 
-    this.handleAutocompleteChange(this.state.currentValue);
+  const onInputChange = (newQueryString) => {
+    setCurrentValue(newQueryString);
+    handleAutocompleteChange(newQueryString);
   };
 
-  executeSearch = () => {
-    this.updateQueryString(this.state.currentValue);
+  const executeSearch = () => {
+    updateQueryString(currentValue);
   };
 
-  render() {
-    const {
-      placeholder = i18next.t("Type something"),
-      suggestions,
-      overridableId = "",
-    } = this.props;
-    return (
-      <Element
-        placeholder={placeholder}
-        queryString={this.state.currentValue}
-        querySuggestions={suggestions}
-        onInputChange={this.onInputChange}
-        executeSearch={this.executeSearch}
-        overridableId={overridableId}
-      />
-    );
-  }
+  const onSuggestionSelected = (suggestion) => {
+    setCurrentValue(suggestion);
+    clearSuggestions();
+    updateQueryString(suggestion);
+  };
+
+  return (
+    <Element
+      placeholder={placeholder}
+      queryString={currentValue}
+      querySuggestions={suggestions}
+      onInputChange={onInputChange}
+      executeSearch={executeSearch}
+      onSuggestionSelected={onSuggestionSelected}
+      overridableId={overridableId}
+    />
+  );
 }
 
 AutocompleteSearchBar.propTypes = {
@@ -97,6 +114,7 @@ const Element = ({
   querySuggestions,
   onInputChange,
   executeSearch,
+  onSuggestionSelected,
   ...props
 }) => {
   const { buildUID } = useContext(AppContext);
@@ -131,24 +149,18 @@ const Element = ({
         <Suggestions
           querySuggestions={querySuggestions}
           overridableId={overridableId}
+          onSuggestionSelected={onSuggestionSelected}
         />
       </div>
     </Overridable>
   );
 };
 
-const Suggestions = ({ overridableId, ...props }) => {
+const Suggestions = ({ overridableId, onSuggestionSelected, ...props }) => {
   const { querySuggestions } = props;
   const { buildUID } = useContext(AppContext);
-  const onSuggestionSelected = async (suggestion) => {
-    await this.setState({
-      currentValue: suggestion,
-    });
-    this.clearSuggestions();
-    this.executeSearch();
-  };
 
-  if (querySuggestions.length === 0) {
+  if (!querySuggestions || querySuggestions.length === 0) {
     return null;
   }
 

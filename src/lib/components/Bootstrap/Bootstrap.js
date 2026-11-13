@@ -4,63 +4,60 @@
  */
 
 import PropTypes from "prop-types";
-import { Component } from "react";
+import { useContext, useEffect } from "react";
 import Overridable from "react-overridable";
 import { AppContext } from "../ReactSearchKit/AppContext";
 
-class Bootstrap extends Component {
-  constructor(props) {
-    super(props);
-    const { searchOnInit = true } = props;
-    this.searchOnInit = searchOnInit;
-    this.eventListenerEnabled = props.eventListenerEnabled ?? false;
-    this.onAppInitialized = props.onAppInitialized;
-    this.searchOnUrlQueryStringChanged = props.searchOnUrlQueryStringChanged;
-  }
+function Bootstrap({
+  eventListenerEnabled = false,
+  onAppInitialized,
+  searchOnUrlQueryStringChanged,
+  searchOnInit = true,
+  updateQueryState,
+  children,
+}) {
+  const { appName } = useContext(AppContext);
 
-  componentDidMount() {
-    if (this.eventListenerEnabled) {
-      window.addEventListener("queryChanged", this.onQueryChanged);
+  useEffect(() => {
+    const onQueryChanged = ({ detail: payload }) => {
+      const appNameNotDefined = !appName;
+      if (appNameNotDefined) {
+        updateQueryState(payload.searchQuery);
+      } else {
+        const eventRecipient = payload.appName;
+        const sameName = eventRecipient === appName;
+        if (sameName) {
+          updateQueryState(payload.searchQuery);
+        } else {
+          console.debug(
+            `React-SearchKit '${appName}': ignoring event sent for app '${eventRecipient}'`
+          );
+        }
+      }
+    };
+
+    if (eventListenerEnabled) {
+      window.addEventListener("queryChanged", onQueryChanged);
     }
     window.onpopstate = () => {
-      this.searchOnUrlQueryStringChanged();
+      searchOnUrlQueryStringChanged();
     };
-    this.onAppInitialized(this.searchOnInit);
-  }
+    onAppInitialized(searchOnInit);
 
-  componentWillUnmount() {
-    window.onpopstate = () => {};
-    window.removeEventListener("queryChanged", this.onQueryChanged);
-  }
+    return () => {
+      window.onpopstate = () => {};
+      window.removeEventListener("queryChanged", onQueryChanged);
+    };
+  }, [
+    eventListenerEnabled,
+    onAppInitialized,
+    searchOnInit,
+    searchOnUrlQueryStringChanged,
+    updateQueryState,
+    appName,
+  ]);
 
-  updateQueryState = (query) => {
-    const { updateQueryState } = this.props;
-    updateQueryState(query);
-  };
-
-  onQueryChanged = ({ detail: payload }) => {
-    const { appName } = this.context;
-
-    const appNameNotDefined = !appName;
-    if (appNameNotDefined) {
-      this.updateQueryState(payload.searchQuery);
-    } else {
-      const eventRecipient = payload.appName;
-      const sameName = eventRecipient === appName;
-      if (sameName) {
-        this.updateQueryState(payload.searchQuery);
-      } else {
-        console.debug(
-          `React-SearchKit '${appName}': ignoring event sent for app '${eventRecipient}'`
-        );
-      }
-    }
-  };
-
-  render() {
-    const { children } = this.props;
-    return children;
-  }
+  return children;
 }
 
 Bootstrap.propTypes = {
@@ -72,7 +69,5 @@ Bootstrap.propTypes = {
   updateQueryState: PropTypes.func.isRequired,
   searchOnUrlQueryStringChanged: PropTypes.func.isRequired,
 };
-
-Bootstrap.contextType = AppContext;
 
 export default Overridable.component("Bootstrap", Bootstrap);

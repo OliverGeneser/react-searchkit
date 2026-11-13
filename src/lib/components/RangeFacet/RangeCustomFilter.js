@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { Component } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import { Checkbox, Button, Input, Label, List } from "semantic-ui-react";
 import PropTypes from "prop-types";
@@ -33,311 +33,318 @@ const DEFAULT_HELP_TEXTS = {
   [VALUE_TYPES.INT]: null,
 };
 
-class RangeCustomFilter extends Component {
-  constructor(props) {
-    super(props);
-    const { min, max, value } = props;
+function RangeCustomFilter({
+  min,
+  max,
+  value,
+  activeMode = null,
+  activeFilter = null,
+  rangeSeparator,
+  valueType = VALUE_TYPES.DATE,
+  onApply,
+  onClear,
+  onActivate,
+  overridableId = "",
+  dateRangeToLabel,
+  helpText,
+  fromAriaLabel,
+  toAriaLabel,
+  applyAriaLabel,
+  customRangeAriaLabel,
+}) {
+  const [checked, setChecked] = useState(false);
+  const [fromValue, setFromValue] = useState(String(value[0] ?? min));
+  const [toValue, setToValue] = useState(String(value[1] ?? max));
+  const [error, setErrorState] = useState(null);
+  const { buildUID } = useContext(AppContext);
 
-    this.state = {
-      checked: false,
-      fromValue: String(value[0] ?? min),
-      toValue: String(value[1] ?? max),
-      error: null,
-    };
-  }
+  const prevActiveModeRef = useRef(activeMode);
+  const prevActiveFilterRef = useRef(activeFilter);
+  const prevValueRef = useRef(value);
+  const prevMinRef = useRef(min);
+  const prevMaxRef = useRef(max);
+  const prevCheckedRef = useRef(checked);
 
-  componentDidMount() {
-    this.syncFromProps();
-    this.syncActiveFilter();
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    const { activeMode = null, activeFilter = null, value, min, max } = this.props;
-    const { activeMode: prevActiveMode = null, activeFilter: prevActiveFilter = null } =
-      prevProps;
-    const { checked } = this.state;
-
-    if (prevActiveMode !== activeMode) {
-      this.syncActiveMode();
-    }
-
-    if (prevActiveMode !== activeMode || prevActiveFilter !== activeFilter) {
-      this.syncActiveFilter();
-    }
-
-    if (activeMode !== RANGE_MODES.CUSTOM && checked && prevProps.value !== value) {
-      this.clearState();
-    }
-
-    if (
-      prevProps.value !== value ||
-      prevProps.min !== min ||
-      prevProps.max !== max ||
-      prevState.checked !== checked
-    ) {
-      this.syncFromProps();
-    }
-  }
-
-  clearState = () => {
-    this.setState({
-      checked: false,
-      error: null,
-    });
+  const clearState = () => {
+    setChecked(false);
+    setErrorState(null);
   };
 
-  syncActiveMode = () => {
-    const { activeMode = null } = this.props;
-    const { checked } = this.state;
-
-    if (activeMode !== RANGE_MODES.CUSTOM && checked) {
-      this.clearState();
-    }
-  };
-
-  syncFromProps = () => {
-    const { value, min, max, activeMode = null, activeFilter = null } = this.props;
-
+  const syncFromProps = () => {
     // If custom mode is active and has a filter, keep the filter values
     if (activeMode === RANGE_MODES.CUSTOM && activeFilter) return;
 
-    this.setState({
-      fromValue: String(value[0] ?? min),
-      toValue: String(value[1] ?? max),
-    });
+    setFromValue(String(value[0] ?? min));
+    setToValue(String(value[1] ?? max));
   };
 
-  syncActiveFilter = () => {
-    const { activeMode = null, activeFilter = null, rangeSeparator } = this.props;
+  const syncActiveFilter = () => {
     if (activeMode !== RANGE_MODES.CUSTOM || !activeFilter) return;
 
     const parts = activeFilter.split(rangeSeparator);
     if (parts.length < 2) return;
 
-    this.setState({
-      checked: true,
-      fromValue: parts[0].trim(),
-      toValue: parts[1].trim(),
-      error: null,
-    });
+    setChecked(true);
+    setFromValue(parts[0].trim());
+    setToValue(parts[1].trim());
+    setErrorState(null);
   };
 
-  formatValue = (input) => {
-    const { valueType = VALUE_TYPES.DATE } = this.props;
+  // componentDidMount equivalent
+  useEffect(() => {
+    syncFromProps();
+    syncActiveFilter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // componentDidUpdate equivalent
+  useEffect(() => {
+    const prevActiveMode = prevActiveModeRef.current;
+    const prevActiveFilter = prevActiveFilterRef.current;
+    const prevValue = prevValueRef.current;
+    const prevMin = prevMinRef.current;
+    const prevMax = prevMaxRef.current;
+    const prevChecked = prevCheckedRef.current;
+
+    if (prevActiveMode !== activeMode) {
+      if (activeMode !== RANGE_MODES.CUSTOM && checked) {
+        setChecked(false);
+        setErrorState(null);
+      }
+    }
+
+    if (prevActiveMode !== activeMode || prevActiveFilter !== activeFilter) {
+      if (activeMode === RANGE_MODES.CUSTOM && activeFilter) {
+        const parts = activeFilter.split(rangeSeparator);
+        if (parts.length >= 2) {
+          setChecked(true);
+          setFromValue(parts[0].trim());
+          setToValue(parts[1].trim());
+          setErrorState(null);
+        }
+      }
+    }
+
+    if (activeMode !== RANGE_MODES.CUSTOM && checked && prevValue !== value) {
+      setChecked(false);
+      setErrorState(null);
+    }
+
+    if (
+      prevValue !== value ||
+      prevMin !== min ||
+      prevMax !== max ||
+      prevChecked !== checked
+    ) {
+      if (!(activeMode === RANGE_MODES.CUSTOM && activeFilter)) {
+        setFromValue(String(value[0] ?? min));
+        setToValue(String(value[1] ?? max));
+      }
+    }
+
+    prevActiveModeRef.current = activeMode;
+    prevActiveFilterRef.current = activeFilter;
+    prevValueRef.current = value;
+    prevMinRef.current = min;
+    prevMaxRef.current = max;
+    prevCheckedRef.current = checked;
+  }, [activeMode, activeFilter, value, min, max, checked, rangeSeparator]);
+
+  const formatValue = (input) => {
     const fn = FORMAT_FNS[valueType] || FORMAT_FNS[VALUE_TYPES.DATE];
     return fn(input);
   };
 
-  handleChange = (field) => (e) => {
-    const formatted = this.formatValue(e.target.value);
-    this.setState({ [field]: formatted, error: null });
+  const handleChange = (field) => (e) => {
+    const formatted = formatValue(e.target.value);
+    if (field === "fromValue") {
+      setFromValue(formatted);
+    } else {
+      setToValue(formatted);
+    }
+    setErrorState(null);
   };
 
   // Normalize a date value by zero-padding parts (e.g. "2025-3" → "2025-03")
-  normalizeValue = (value) => {
-    if (!value) return value;
-    const { valueType = VALUE_TYPES.DATE } = this.props;
-    if (valueType === VALUE_TYPES.INT) return value;
-    const parts = value.split("-");
+  const normalizeValue = (val) => {
+    if (!val) return val;
+    if (valueType === VALUE_TYPES.INT) return val;
+    const parts = val.split("-");
     return parts
       .map((p, i) => (i === 0 ? p.padStart(4, "0") : p.padStart(2, "0")))
       .join("-");
   };
 
   // Clicking into an input auto-activates the custom radio
-  activateOnFocus = () => {
-    const { checked } = this.state;
+  const activateOnFocus = () => {
     if (!checked) {
-      this.toggleChecked();
+      toggleChecked();
     }
   };
 
   // Parse a normalized date string (YYYY, YYYY-MM, or YYYY-MM-DD) into a DateTime.
   // For partial dates, fills in start-of-period or end-of-period defaults.
-  parseDate = (value, isStart) => {
-    const dt = DateTime.fromISO(value);
+  const parseDate = (val, isStart) => {
+    const dt = DateTime.fromISO(val);
     if (!dt.isValid) return dt;
-    if (value.length === 4) return isStart ? dt.startOf("year") : dt.endOf("year");
-    if (value.length === 7) return isStart ? dt.startOf("month") : dt.endOf("month");
+    if (val.length === 4) return isStart ? dt.startOf("year") : dt.endOf("year");
+    if (val.length === 7) return isStart ? dt.startOf("month") : dt.endOf("month");
     return dt;
   };
 
-  parseValue = (value, isStart) => {
-    const { valueType = VALUE_TYPES.DATE } = this.props;
+  const parseValue = (val, isStart) => {
     if (valueType === VALUE_TYPES.INT) {
-      const n = Number(value);
+      const n = Number(val);
       return Number.isFinite(n) ? n : null;
     }
-    const dt = this.parseDate(value, isStart);
+    const dt = parseDate(val, isStart);
     return dt?.isValid ? dt : null;
   };
 
-  validate = (fromValue, toValue) => {
-    const { valueType = VALUE_TYPES.DATE } = this.props;
+  const setError = (err) => {
+    setErrorState(err);
+    return false;
+  };
+
+  const validate = (fromVal, toVal) => {
     const isDate = valueType !== VALUE_TYPES.INT;
 
-    if (!fromValue && !toValue) {
-      return this.setError(i18next.t("Enter at least one value"));
+    if (!fromVal && !toVal) {
+      return setError(i18next.t("Enter at least one value"));
     }
 
-    if (fromValue) {
-      if (isDate && fromValue.length < 4) {
-        return this.setError(i18next.t("Year must be 4 digits"));
+    if (fromVal) {
+      if (isDate && fromVal.length < 4) {
+        return setError(i18next.t("Year must be 4 digits"));
       }
-      const from = this.parseValue(fromValue, true);
+      const from = parseValue(fromVal, true);
       if (from === null) {
-        return this.setError(
+        return setError(
           isDate ? i18next.t("Invalid date") : i18next.t("Invalid number")
         );
       }
     }
 
-    if (toValue) {
-      if (isDate && toValue.length < 4) {
-        return this.setError(i18next.t("Year must be 4 digits"));
+    if (toVal) {
+      if (isDate && toVal.length < 4) {
+        return setError(i18next.t("Year must be 4 digits"));
       }
-      const to = this.parseValue(toValue, false);
+      const to = parseValue(toVal, false);
       if (to === null) {
-        return this.setError(
+        return setError(
           isDate ? i18next.t("Invalid date") : i18next.t("Invalid number")
         );
       }
     }
 
-    if (fromValue && toValue) {
-      const from = this.parseValue(fromValue, true);
-      const to = this.parseValue(toValue, false);
+    if (fromVal && toVal) {
+      const from = parseValue(fromVal, true);
+      const to = parseValue(toVal, false);
       if (from > to) {
-        return this.setError(i18next.t("Start must be before end"));
+        return setError(i18next.t("Start must be before end"));
       }
     }
 
     return true;
   };
 
-  setError = (error) => {
-    this.setState({ error });
-    return false;
-  };
-
-  applyRange = () => {
-    const { checked, fromValue, toValue } = this.state;
-    const { rangeSeparator, onApply, activeFilter = null } = this.props;
-
+  const applyRange = () => {
     if (!checked) return;
 
     // Normalize to zero-padded ISO format (e.g. "2025-3" → "2025-03")
-    const normalizedFrom = this.normalizeValue(fromValue);
-    const normalizedTo = this.normalizeValue(toValue);
+    const normalizedFrom = normalizeValue(fromValue);
+    const normalizedTo = normalizeValue(toValue);
 
     // Skip if values haven't changed
     const rangeString = `${normalizedFrom}${rangeSeparator}${normalizedTo}`;
     if (rangeString === activeFilter) return;
 
-    if (!this.validate(normalizedFrom, normalizedTo)) return;
+    if (!validate(normalizedFrom, normalizedTo)) return;
 
     // Extract years for slider range; fall back to min/max for open-ended ranges
-    const { min, max } = this.props;
     const fromYear = normalizedFrom ? parseInt(normalizedFrom.slice(0, 4), 10) : min;
     const toYear = normalizedTo ? parseInt(normalizedTo.slice(0, 4), 10) : max;
 
     onApply([fromYear, toYear], rangeString);
   };
 
-  handleKeyDown = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === "Enter") {
-      this.applyRange();
+      applyRange();
     }
   };
 
-  toggleChecked = () => {
-    const { checked } = this.state;
-    const { onClear, onActivate } = this.props;
+  const toggleChecked = () => {
     // Disable the custom filter and clear the active filter
     if (checked) {
-      this.clearState();
+      clearState();
       onClear();
       return;
     }
     // Enable the custom filter
     onActivate();
-    this.setState({ checked: true });
+    setChecked(true);
   };
 
-  render() {
-    const { checked, fromValue, toValue, error } = this.state;
-    const {
-      overridableId = "",
-      activeFilter = null,
-      dateRangeToLabel = i18next.t("to"),
-      helpText,
-      valueType = VALUE_TYPES.DATE,
-      fromAriaLabel = i18next.t("From"),
-      toAriaLabel = i18next.t("To"),
-      applyAriaLabel = i18next.t("Apply custom range"),
-      customRangeAriaLabel = i18next.t("Custom range"),
-    } = this.props;
-    const { buildUID } = this.context;
-    const resolvedHelpText = helpText ?? DEFAULT_HELP_TEXTS[valueType];
+  const resolvedHelpText = helpText ?? DEFAULT_HELP_TEXTS[valueType];
 
-    return (
-      <Overridable
-        id={buildUID("RangeFacet.CustomFilter.element", overridableId)}
-        checked={checked}
-        error={error}
-        activeFilter={activeFilter}
-      >
-        <List.Item className="searchkit-daterange-custom-item">
-          <Checkbox
-            radio
-            checked={checked}
-            onChange={this.toggleChecked}
-            aria-label={customRangeAriaLabel}
-          />
-          <div className="searchkit-daterange-custom-body">
-            <div className="searchkit-daterange-custom-filter">
-              <Input
-                size="mini"
-                value={fromValue}
-                onChange={this.handleChange("fromValue")}
-                onFocus={this.activateOnFocus}
-                onKeyDown={this.handleKeyDown}
-                inputMode="numeric"
-                dir="ltr"
-                error={!!error}
-                className="searchkit-daterange-masked-input"
-                aria-label={fromAriaLabel}
-              />
-              <span>{dateRangeToLabel}</span>
-              <Input
-                size="mini"
-                value={toValue}
-                onChange={this.handleChange("toValue")}
-                onFocus={this.activateOnFocus}
-                onKeyDown={this.handleKeyDown}
-                inputMode="numeric"
-                dir="ltr"
-                error={!!error}
-                className="searchkit-daterange-masked-input"
-                aria-label={toAriaLabel}
-              />
-              <Button
-                type="button"
-                primary
-                size="mini"
-                icon="search"
-                disabled={!checked}
-                onClick={this.applyRange}
-                aria-label={applyAriaLabel}
-              />
-            </div>
-            {resolvedHelpText && <label className="helptext">{resolvedHelpText}</label>}
-            {error && <Label basic color="red" size="tiny" content={error} />}
+  return (
+    <Overridable
+      id={buildUID("RangeFacet.CustomFilter.element", overridableId)}
+      checked={checked}
+      error={error}
+      activeFilter={activeFilter}
+    >
+      <List.Item className="searchkit-daterange-custom-item">
+        <Checkbox
+          radio
+          checked={checked}
+          onChange={toggleChecked}
+          aria-label={customRangeAriaLabel}
+        />
+        <div className="searchkit-daterange-custom-body">
+          <div className="searchkit-daterange-custom-filter">
+            <Input
+              size="mini"
+              value={fromValue}
+              onChange={handleChange("fromValue")}
+              onFocus={activateOnFocus}
+              onKeyDown={handleKeyDown}
+              inputMode="numeric"
+              dir="ltr"
+              error={!!error}
+              className="searchkit-daterange-masked-input"
+              aria-label={fromAriaLabel}
+            />
+            <span>{dateRangeToLabel}</span>
+            <Input
+              size="mini"
+              value={toValue}
+              onChange={handleChange("toValue")}
+              onFocus={activateOnFocus}
+              onKeyDown={handleKeyDown}
+              inputMode="numeric"
+              dir="ltr"
+              error={!!error}
+              className="searchkit-daterange-masked-input"
+              aria-label={toAriaLabel}
+            />
+            <Button
+              type="button"
+              primary
+              size="mini"
+              icon="search"
+              disabled={!checked}
+              onClick={applyRange}
+              aria-label={applyAriaLabel}
+            />
           </div>
-        </List.Item>
-      </Overridable>
-    );
-  }
+          {resolvedHelpText && <label className="helptext">{resolvedHelpText}</label>}
+          {error && <Label basic color="red" size="tiny" content={error} />}
+        </div>
+      </List.Item>
+    </Overridable>
+  );
 }
 
 RangeCustomFilter.propTypes = {
@@ -359,7 +366,5 @@ RangeCustomFilter.propTypes = {
   applyAriaLabel: PropTypes.string,
   customRangeAriaLabel: PropTypes.string,
 };
-
-RangeCustomFilter.contextType = AppContext;
 
 export default RangeCustomFilter;

@@ -4,21 +4,21 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext } from "react";
 import Overridable from "react-overridable";
 import { Checkbox, List } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 
-class BucketAggregationValues extends Component {
-  constructor(props) {
-    super(props);
-    this.field = props.field;
-    this.aggName = props.aggName;
-    this.childAgg = props.childAgg ?? null;
-    this.onFilterClicked = props.onFilterClicked;
-  }
-
-  _isSelected = (aggName, value, selectedFilters) => {
+function BucketAggregationValues({
+  field,
+  aggName,
+  childAgg,
+  onFilterClicked,
+  buckets,
+  selectedFilters,
+  overridableId,
+}) {
+  const _isSelected = (aggName, value, selectedFilters) => {
     // return True there is at least one filter that has this value
     return (
       selectedFilters.filter((filter) => filter[0] === aggName && filter[1] === value)
@@ -26,60 +26,57 @@ class BucketAggregationValues extends Component {
     );
   };
 
-  getChildAggCmps = (bucket, selectedFilters) => {
-    const hasChildAggregation = this.childAgg && this.childAgg["aggName"] in bucket;
+  const getChildAggCmps = (bucket, selectedFilters) => {
+    const hasChildAggregation = childAgg && childAgg["aggName"] in bucket;
     let selectedChildFilters = [];
     if (hasChildAggregation) {
-      const childBuckets = bucket[this.childAgg["aggName"]]["buckets"];
+      const childBuckets = bucket[childAgg["aggName"]]["buckets"];
       selectedFilters.forEach((filter) => {
-        const isThisAggregation = filter[0] === this.aggName;
+        const isThisAggregation = filter[0] === aggName;
         const isThisValue = filter[1] === bucket.key;
         const hasChild = filter.length === 3;
         if (isThisAggregation && isThisValue && hasChild) {
           selectedChildFilters.push(filter[2]);
         }
       });
-      const onFilterClicked = (value) => {
-        this.onFilterClicked([this.aggName, bucket.key, value]);
+      const handleChildFilterClicked = (value) => {
+        onFilterClicked([aggName, bucket.key, value]);
       };
       return (
         <BucketAggregationValues
           buckets={childBuckets}
           selectedFilters={selectedChildFilters}
-          field={this.childAgg.field}
-          aggName={this.childAgg.aggName}
-          childAgg={this.childAgg.childAgg}
-          onFilterClicked={onFilterClicked}
+          field={childAgg.field}
+          aggName={childAgg.aggName}
+          childAgg={childAgg.childAgg}
+          onFilterClicked={handleChildFilterClicked}
         />
       );
     }
     return null;
   };
 
-  render() {
-    const { buckets, selectedFilters, overridableId = "" } = this.props;
-    const valuesCmp = buckets.map((bucket) => {
-      const keyField = bucket.key_as_string ? bucket.key_as_string : bucket.key;
-      const isSelected = this._isSelected(this.aggName, keyField, selectedFilters);
-      const onFilterClicked = (value) => {
-        this.onFilterClicked([this.aggName, value]);
-      };
-      const getChildAggCmps = (bucket) => this.getChildAggCmps(bucket, selectedFilters);
+  const valuesCmp = buckets.map((bucket) => {
+    const keyField = bucket.key_as_string ? bucket.key_as_string : bucket.key;
+    const isSelected = _isSelected(aggName, keyField, selectedFilters);
+    const handleFilterClicked = (value) => {
+      onFilterClicked([aggName, value]);
+    };
+    const getChildCmpsForBucket = (bucket) => getChildAggCmps(bucket, selectedFilters);
 
-      return (
-        <ValueElement
-          key={bucket.key}
-          bucket={bucket}
-          keyField={keyField}
-          isSelected={isSelected}
-          onFilterClicked={onFilterClicked}
-          getChildAggCmps={getChildAggCmps}
-          overridableId={overridableId}
-        />
-      );
-    });
-    return <ContainerElement valuesCmp={valuesCmp} overridableId={overridableId} />;
-  }
+    return (
+      <ValueElement
+        key={bucket.key}
+        bucket={bucket}
+        keyField={keyField}
+        isSelected={isSelected}
+        onFilterClicked={handleFilterClicked}
+        getChildAggCmps={getChildCmpsForBucket}
+        overridableId={overridableId}
+      />
+    );
+  });
+  return <ContainerElement valuesCmp={valuesCmp} overridableId={overridableId} />;
 }
 
 BucketAggregationValues.propTypes = {

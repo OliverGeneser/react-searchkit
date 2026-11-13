@@ -3,46 +3,29 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { Component, useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Checkbox, List } from "semantic-ui-react";
 import PropTypes from "prop-types";
 import Overridable from "react-overridable";
 import { RANGE_MODES, resolveDefaultRange, findDefaultLabel } from "./utils";
 import { AppContext } from "../ReactSearchKit";
 
-class RangeDefaultFilters extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      activeLabel: null,
-    };
-  }
+function RangeDefaultFilters({
+  activeMode = null,
+  activeFilter = null,
+  ranges,
+  min,
+  max,
+  rangeSeparator,
+  onSelect,
+  onClear,
+  overridableId = "",
+}) {
+  const [activeLabel, setActiveLabel] = useState(null);
 
-  componentDidMount() {
-    this.syncActiveLabel();
-  }
-
-  componentDidUpdate(prevProps) {
-    const { activeMode = null, activeFilter = null } = this.props;
-    const { activeMode: prevActiveMode = null, activeFilter: prevActiveFilter = null } =
-      prevProps;
-    if (prevActiveMode !== activeMode || prevActiveFilter !== activeFilter) {
-      this.syncActiveLabel();
-    }
-  }
-
-  syncActiveLabel = () => {
-    const {
-      activeMode = null,
-      activeFilter = null,
-      ranges,
-      min,
-      max,
-      rangeSeparator,
-    } = this.props;
-
+  const syncActiveLabel = () => {
     if (activeMode !== RANGE_MODES.DEFAULT || !activeFilter) {
-      this.setState({ activeLabel: null });
+      setActiveLabel(null);
       return;
     }
 
@@ -53,40 +36,43 @@ class RangeDefaultFilters extends Component {
       max,
       rangeSeparator
     );
-    this.setState({ activeLabel: defaultLabel ?? null });
+    setActiveLabel(defaultLabel ?? null);
   };
 
-  handleToggle = (range, checked) => {
-    const { min, max, rangeSeparator, onSelect, onClear } = this.props;
+  useEffect(() => {
+    syncActiveLabel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  useEffect(() => {
+    syncActiveLabel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode, activeFilter, ranges, min, max, rangeSeparator]);
+
+  const handleToggle = (range, checked) => {
     if (checked) {
-      this.setState({ activeLabel: null });
+      setActiveLabel(null);
       onClear();
       return;
     }
 
     const resolved = resolveDefaultRange(range, min, max, rangeSeparator);
     if (resolved) {
-      this.setState({ activeLabel: range.label });
+      setActiveLabel(range.label);
       onSelect(resolved.yearRange, resolved.dateRangeString);
     }
   };
 
-  render() {
-    const { ranges, overridableId = "" } = this.props;
-    const { activeLabel } = this.state;
+  if (ranges.length === 0) return null;
 
-    if (ranges.length === 0) return null;
-
-    return (
-      <RangeDefaultFiltersElement
-        ranges={ranges}
-        activeLabel={activeLabel}
-        onToggle={this.handleToggle}
-        overridableId={overridableId}
-      />
-    );
-  }
+  return (
+    <RangeDefaultFiltersElement
+      ranges={ranges}
+      activeLabel={activeLabel}
+      onToggle={handleToggle}
+      overridableId={overridableId}
+    />
+  );
 }
 RangeDefaultFilters.propTypes = {
   ranges: PropTypes.arrayOf(

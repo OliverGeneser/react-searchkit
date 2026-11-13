@@ -4,7 +4,6 @@
  */
 
 import _truncate from "lodash/truncate";
-import { Component } from "react";
 import PropTypes from "prop-types";
 import { OverridableContext } from "react-overridable";
 import {
@@ -67,23 +66,20 @@ const customAggValueCmp = (bucket, isSelected, onFilterClicked, getChildAggCmps)
   );
 };
 
-class Tags extends Component {
-  onClick = (event, value) => {
+function Tags({ tags }) {
+  const onClick = (event, value) => {
     window.history.push({
       search: `${window.location.search}&f=tags_agg:${value}`,
     });
     event.preventDefault();
   };
 
-  render() {
-    const { tags } = this.props;
-    return tags.map((tag, index) => (
-      // eslint-disable-next-line react/no-array-index-key
-      <Button key={index} size="mini" onClick={(event) => this.onClick(event, tag)}>
-        {tag}
-      </Button>
-    ));
-  }
+  return tags.map((tag, index) => (
+    // eslint-disable-next-line react/no-array-index-key
+    <Button key={index} size="mini" onClick={(event) => onClick(event, tag)}>
+      {tag}
+    </Button>
+  ));
 }
 
 Tags.propTypes = {

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { Component } from "react";
+import { useState } from "react";
 import { Button, Container, Divider, Header, Menu, Segment } from "semantic-ui-react";
 import { CERNVideosReactSearchKit } from "./cern-videos";
 import NamespacedExample from "./cern-videos-namespaced/app";
@@ -33,25 +33,21 @@ const demos = {
   },
 };
 
-export default class App extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { activeDemo: null };
-  }
+export default function App() {
+  const [activeDemo, setActiveDemo] = useState(null);
 
-  resetUrlParams = () => {
+  const resetUrlParams = () => {
     window.history.pushState({}, document.title, "/");
   };
 
-  renderHeader = () => {
-    const { activeDemo } = this.state;
+  const renderHeader = () => {
     const demoMenus = Object.keys(demos).map((key) => (
       <Menu.Item
         key={key}
         name={key}
         active={activeDemo === key}
         onClick={() => {
-          this.setState({ activeDemo: key });
+          setActiveDemo(key);
         }}
       >
         {demos[key].label}
@@ -65,8 +61,8 @@ export default class App extends Component {
             <Menu.Item
               header
               onClick={() => {
-                this.setState({ activeDemo: null });
-                this.resetUrlParams();
+                setActiveDemo(null);
+                resetUrlParams();
               }}
             >
               React-SearchKit
@@ -78,8 +74,7 @@ export default class App extends Component {
     );
   };
 
-  renderContent = () => {
-    const { activeDemo } = this.state;
+  const renderContent = () => {
     const links = Object.keys(demos).map((key) => (
       <Segment placeholder textAlign="center" key={key}>
         <Header>{demos[key].label}</Header>
@@ -87,7 +82,7 @@ export default class App extends Component {
         <Button
           primary
           onClick={() => {
-            this.setState({ activeDemo: key });
+            setActiveDemo(key);
           }}
         >
           Try it out!
@@ -110,17 +105,14 @@ export default class App extends Component {
     return <Container>{cmp}</Container>;
   };
 
-  render = () => {
-    const { activeDemo } = this.state;
-    if (!activeDemo) {
-      this.resetUrlParams();
-    }
-    return (
-      <>
-        {this.renderHeader()}
-        <Divider hidden />
-        {this.renderContent()}
-      </>
-    );
-  };
+  if (!activeDemo) {
+    resetUrlParams();
+  }
+  return (
+    <>
+      {renderHeader()}
+      <Divider hidden />
+      {renderContent()}
+    </>
+  );
 }

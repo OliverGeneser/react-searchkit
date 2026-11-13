@@ -4,7 +4,7 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useEffect, useMemo } from "react";
 import Overridable from "react-overridable";
 import { Pagination as Paginator } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
@@ -37,50 +37,45 @@ const defaultOptions = {
   size: "large",
 };
 
-class Pagination extends Component {
-  constructor(props) {
-    super(props);
-    this.updateQueryPage = props.updateQueryPage;
-    this.options = props.options
-      ? { ...defaultOptions, ...props.options }
-      : defaultOptions;
-  }
+function Pagination({
+  updateQueryPage,
+  options,
+  currentPage,
+  loading,
+  totalResults,
+  currentSize,
+  overridableId = "",
+  showWhenOnlyOnePage = true,
+}) {
+  const mergedOptions = useMemo(
+    () => (options ? { ...defaultOptions, ...options } : defaultOptions),
+    [options]
+  );
 
-  onPageChange = (activePage) => {
-    const { currentPage } = this.props;
+  const onPageChange = (activePage) => {
     if (activePage === currentPage) return;
-    this.updateQueryPage(activePage);
+    updateQueryPage(activePage);
   };
 
-  render() {
-    const {
-      loading,
-      totalResults,
-      currentPage,
-      currentSize,
-      overridableId = "",
-      showWhenOnlyOnePage = true,
-    } = this.props;
-    return (
-      <ShouldRender
-        condition={
-          !loading && currentPage > -1 && currentSize > -1 && showWhenOnlyOnePage
-            ? totalResults > 0
-            : totalResults > currentSize
-        }
-      >
-        <Element
-          currentPage={currentPage}
-          currentSize={currentSize}
-          totalResults={totalResults}
-          onPageChange={this.onPageChange}
-          options={this.options}
-          overridableId={overridableId}
-          maxTotalResults={this.options.maxTotalResults}
-        />
-      </ShouldRender>
-    );
-  }
+  return (
+    <ShouldRender
+      condition={
+        !loading && currentPage > -1 && currentSize > -1 && showWhenOnlyOnePage
+          ? totalResults > 0
+          : totalResults > currentSize
+      }
+    >
+      <Element
+        currentPage={currentPage}
+        currentSize={currentSize}
+        totalResults={totalResults}
+        onPageChange={onPageChange}
+        options={mergedOptions}
+        overridableId={overridableId}
+        maxTotalResults={mergedOptions.maxTotalResults}
+      />
+    </ShouldRender>
+  );
 }
 
 Pagination.propTypes = {
@@ -129,7 +124,13 @@ const Element = ({
   const totalDisplayedPages = Math.min(pages, maxTotalPages);
 
   const { buildUID } = useContext(AppContext);
-  if (currentPage > pages) onPageChange(pages);
+  useEffect(() => {
+    if (currentPage > pages) {
+      onPageChange(pages);
+    }
+    // Only run when page counts change; onPageChange is stable per render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, pages]);
 
   return (
     <Overridable

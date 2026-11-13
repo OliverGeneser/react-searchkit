@@ -4,24 +4,19 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext } from "react";
 import Overridable from "react-overridable";
 import { Icon, Label } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 
-class ActiveFilters extends Component {
-  constructor(props) {
-    super(props);
-    this.updateQueryFilters = props.updateQueryFilters;
-  }
-
-  _getLabel = (filter) => {
+function ActiveFilters({ updateQueryFilters, filters, overridableId }) {
+  const _getLabel = (filter) => {
     const aggName = filter[0];
     let value = filter[1];
     let currentFilter = [aggName, value];
     const hasChild = filter.length === 3;
     if (hasChild) {
-      const { label, activeFilter } = this._getLabel(filter[2]);
+      const { label, activeFilter } = _getLabel(filter[2]);
       value = `${value}.${label}`;
       currentFilter.push(activeFilter);
     }
@@ -31,19 +26,16 @@ class ActiveFilters extends Component {
     };
   };
 
-  render() {
-    const { filters, overridableId = "" } = this.props;
-    return (
-      !!filters.length && (
-        <Element
-          filters={filters}
-          removeActiveFilter={this.updateQueryFilters}
-          getLabel={this._getLabel}
-          overridableId={overridableId}
-        />
-      )
-    );
-  }
+  return (
+    !!filters.length && (
+      <Element
+        filters={filters}
+        removeActiveFilter={updateQueryFilters}
+        getLabel={_getLabel}
+        overridableId={overridableId}
+      />
+    )
+  );
 }
 
 ActiveFilters.propTypes = {

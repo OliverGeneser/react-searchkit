@@ -5,53 +5,45 @@
  */
 
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useMemo } from "react";
 import Overridable from "react-overridable";
 import { Dropdown } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import { ShouldRender } from "../ShouldRender";
 import { i18next } from "@translations/i18next";
 
-class SortOrder extends Component {
-  constructor(props) {
-    super(props);
-    this.options = props.values;
-    this.updateQuerySortOrder = props.updateQuerySortOrder;
-  }
+function SortOrder({
+  values,
+  updateQuerySortOrder,
+  currentSortOrder,
+  loading,
+  totalResults,
+  label = (cmp) => cmp,
+  overridableId = "",
+  ariaLabel,
+  selectOnNavigation = false,
+}) {
+  const options = useMemo(() => values, [values]);
 
-  onChange = (value) => {
-    const { currentSortOrder } = this.props;
+  const onChange = (value) => {
     if (value === currentSortOrder) return;
-    this.updateQuerySortOrder(value);
+    updateQuerySortOrder(value);
   };
 
-  render() {
-    const {
-      currentSortOrder = null,
-      loading,
-      totalResults,
-      label = (cmp) => cmp,
-      overridableId = "",
-      ariaLabel = i18next.t("Sort Order"),
-      selectOnNavigation = false,
-    } = this.props;
-    return (
-      <ShouldRender
-        condition={currentSortOrder !== null && !loading && totalResults > 0}
-      >
-        {label(
-          <Element
-            currentSortOrder={currentSortOrder}
-            options={this.options}
-            onValueChange={this.onChange}
-            overridableId={overridableId}
-            ariaLabel={ariaLabel}
-            selectOnNavigation={selectOnNavigation}
-          />
-        )}
-      </ShouldRender>
-    );
-  }
+  return (
+    <ShouldRender condition={currentSortOrder !== null && !loading && totalResults > 0}>
+      {label(
+        <Element
+          currentSortOrder={currentSortOrder}
+          options={options}
+          onValueChange={onChange}
+          overridableId={overridableId}
+          ariaLabel={ariaLabel}
+          selectOnNavigation={selectOnNavigation}
+        />
+      )}
+    </ShouldRender>
+  );
 }
 
 SortOrder.propTypes = {

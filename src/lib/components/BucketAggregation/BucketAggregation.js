@@ -5,47 +5,47 @@
 
 import _get from "lodash/get";
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext } from "react";
 import Overridable from "react-overridable";
 import { Card } from "semantic-ui-react";
 import { AppContext } from "../ReactSearchKit";
 import BucketAggregationValues from "./BucketAggregationValues";
 
-class BucketAggregation extends Component {
-  constructor(props) {
-    super(props);
-    this.title = props.title;
-    this.agg = props.agg;
-    this.updateQueryFilters = props.updateQueryFilters;
-  }
-
-  onFilterClicked = (filter) => {
-    this.updateQueryFilters(filter);
+function BucketAggregation({
+  title,
+  agg,
+  updateQueryFilters,
+  overridableId = "",
+  userSelectionFilters,
+  resultsAggregations,
+  ...props
+}) {
+  const onFilterClicked = (filter) => {
+    updateQueryFilters(filter);
   };
 
-  _renderValues = (resultBuckets, selectedFilters) => {
-    const { overridableId = "" } = this.props;
+  const _renderValues = (resultBuckets, selectedFilters) => {
     return (
       <BucketAggregationValues
         buckets={resultBuckets}
         selectedFilters={selectedFilters}
-        field={this.agg.field}
-        aggName={this.agg.aggName}
-        childAgg={this.agg.childAgg}
-        onFilterClicked={this.onFilterClicked}
+        field={agg.field}
+        aggName={agg.aggName}
+        childAgg={agg.childAgg}
+        onFilterClicked={onFilterClicked}
         overridableId={overridableId}
       />
     );
   };
 
-  _getSelectedFilters = (userSelectionFilters) => {
+  const _getSelectedFilters = (userSelectionFilters) => {
     // get selected filters for this field only
-    return userSelectionFilters.filter((filter) => filter[0] === this.agg.aggName);
+    return userSelectionFilters.filter((filter) => filter[0] === agg.aggName);
   };
 
-  _getResultBuckets = (resultsAggregations) => {
+  const _getResultBuckets = (resultsAggregations) => {
     // get buckets of this field
-    const thisAggs = _get(resultsAggregations, this.agg.aggName, {});
+    const thisAggs = _get(resultsAggregations, agg.aggName, {});
     if ("buckets" in thisAggs) {
       if (!Array.isArray(thisAggs["buckets"])) {
         // buckets can be objects or arrays: convert to array if object
@@ -59,27 +59,19 @@ class BucketAggregation extends Component {
     return [];
   };
 
-  render() {
-    const {
-      userSelectionFilters,
-      resultsAggregations,
-      overridableId = "",
-      ...props
-    } = this.props;
-    const selectedFilters = this._getSelectedFilters(userSelectionFilters);
-    const resultBuckets = this._getResultBuckets(resultsAggregations);
-    const valuesCmp = resultBuckets.length
-      ? this._renderValues(resultBuckets, selectedFilters)
-      : null;
-    return (
-      <Element
-        title={this.title}
-        containerCmp={valuesCmp}
-        overridableId={overridableId}
-        {...props}
-      />
-    );
-  }
+  const selectedFilters = _getSelectedFilters(userSelectionFilters);
+  const resultBuckets = _getResultBuckets(resultsAggregations);
+  const valuesCmp = resultBuckets.length
+    ? _renderValues(resultBuckets, selectedFilters)
+    : null;
+  return (
+    <Element
+      title={title}
+      containerCmp={valuesCmp}
+      overridableId={overridableId}
+      {...props}
+    />
+  );
 }
 
 BucketAggregation.propTypes = {

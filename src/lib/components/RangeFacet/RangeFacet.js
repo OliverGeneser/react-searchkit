@@ -7,7 +7,7 @@ import "./RangeFacet.scss";
 
 import _debounce from "lodash/debounce";
 import PropTypes from "prop-types";
-import { Component, useContext } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import Overridable from "react-overridable";
 import { Card, List } from "semantic-ui-react";
 import { withState } from "../HOC";
@@ -29,78 +29,30 @@ import { i18next } from "@translations/i18next";
 
 const DEFAULT_RANGES = [];
 
-class RangeFacet extends Component {
-  constructor(props) {
-    super(props);
-
-    const { min, max } = this.getMinMax();
-
-    this.state = {
-      range: [min, max],
-      activeMode: null,
-      activeFilter: null,
-    };
-
-    this.debouncedUpdateQuery = _debounce((newRange, dateRangeString) => {
-      const { agg, rangeSeparator, updateQueryState, currentQueryState } = this.props;
-      const [from, to] = [...newRange].sort();
-      const filters = (currentQueryState.filters || []).filter(
-        (f) => Array.isArray(f) && f[0] !== agg.aggName
-      );
-
-      // Use dateRangeString if provided (from custom filter), otherwise use year-only format
-      const filterValue = dateRangeString || `${from}${rangeSeparator}${to}`;
-
-      updateQueryState({
-        ...currentQueryState,
-        filters: [...filters, [agg.aggName, filterValue]],
-      });
-    }, 500);
-  }
-
-  componentDidMount() {
-    this.syncStateWithFilters();
-  }
-
-  componentDidUpdate(prevProps) {
-    const {
-      currentQueryState,
-      agg,
-      defaultRanges = DEFAULT_RANGES,
-      enableCustomRange = false,
-      rangeSeparator,
-      currentResultsState,
-    } = this.props;
-    const {
-      defaultRanges: previousDefaultRanges = DEFAULT_RANGES,
-      enableCustomRange: previousEnableCustomRange = false,
-    } = prevProps;
-    if (
-      prevProps.currentQueryState.filters !== currentQueryState.filters ||
-      prevProps.agg.aggName !== agg.aggName ||
-      previousDefaultRanges !== defaultRanges ||
-      previousEnableCustomRange !== enableCustomRange ||
-      prevProps.rangeSeparator !== rangeSeparator ||
-      prevProps.currentResultsState !== currentResultsState
-    ) {
-      this.syncStateWithFilters();
-    }
-  }
-
-  componentWillUnmount() {
-    if (this.debouncedUpdateQuery?.cancel) {
-      this.debouncedUpdateQuery.cancel();
-    }
-  }
-
-  getBuckets = () => {
-    const { currentResultsState, agg } = this.props;
+function RangeFacet({
+  agg,
+  rangeSeparator,
+  updateQueryState,
+  currentQueryState,
+  defaultRanges = DEFAULT_RANGES,
+  enableCustomRange = false,
+  currentResultsState,
+  title,
+  overridableId = "",
+  histogramHeight = 100,
+  dateRangeToLabel = i18next.t("to"),
+  fromAriaLabel,
+  toAriaLabel,
+  applyAriaLabel,
+  customRangeAriaLabel,
+}) {
+  const getBuckets = () => {
     const resultsAggregations = currentResultsState?.data?.aggregations;
     return extractBuckets(resultsAggregations, agg.aggName);
   };
 
-  getMinMax = () => {
-    const buckets = this.getBuckets();
+  const getMinMax = () => {
+    const buckets = getBuckets();
     const years = buckets
       .map((b) => Number(getKey(b)))
       .filter((v) => Number.isInteger(v));
@@ -109,32 +61,53 @@ class RangeFacet extends Component {
     return { min, max };
   };
 
-  syncStateWithFilters = () => {
-    const {
-      agg,
-      currentQueryState,
-      defaultRanges = DEFAULT_RANGES,
-      rangeSeparator,
-    } = this.props;
-    const { min, max } = this.getMinMax();
+  const initialMinMax = getMinMax();
+  const [range, setRange] = useState([initialMinMax.min, initialMinMax.max]);
+  const [activeMode, setActiveMode] = useState(null);
+  const [activeFilter, setActiveFilter] = useState(null);
+
+  const currentQueryStateRef = useRef(currentQueryState);
+  currentQueryStateRef.current = currentQueryState;
+
+  const debouncedUpdateQuery = useMemo(
+    () =>
+      _debounce((newRange, dateRangeString) => {
+        const latestQueryState = currentQueryStateRef.current;
+        const [from, to] = [...newRange].sort();
+        const filters = (latestQueryState.filters || []).filter(
+          (f) => Array.isArray(f) && f[0] !== agg.aggName
+        );
+
+        // Use dateRangeString if provided (from custom filter), otherwise use year-only format
+        const filterValue = dateRangeString || `${from}${rangeSeparator}${to}`;
+
+        updateQueryState({
+          ...latestQueryState,
+          filters: [...filters, [agg.aggName, filterValue]],
+        });
+      }, 500),
+    [agg.aggName, rangeSeparator, updateQueryState]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (debouncedUpdateQuery?.cancel) {
+        debouncedUpdateQuery.cancel();
+      }
+    };
+  }, [debouncedUpdateQuery]);
+
+  const syncStateWithFilters = () => {
+    const { min, max } = getMinMax();
 
     const filter = (currentQueryState.filters || []).find(
       (f) => Array.isArray(f) && f[0] === agg.aggName
     );
 
     if (!filter) {
-      this.setState((state) =>
-        state.range[0] === min &&
-        state.range[1] === max &&
-        state.activeMode === null &&
-        state.activeFilter === null
-          ? null
-          : {
-              range: [min, max],
-              activeMode: null,
-              activeFilter: null,
-            }
-      );
+      setRange((prev) => (prev[0] === min && prev[1] === max ? prev : [min, max]));
+      setActiveMode((prev) => (prev === null ? prev : null));
+      setActiveFilter((prev) => (prev === null ? prev : null));
       return;
     }
 
@@ -148,18 +121,9 @@ class RangeFacet extends Component {
     );
     const parsedFilter = parseFilterYears(normalizedFilterValue, rangeSeparator);
     if (!parsedFilter) {
-      this.setState((state) =>
-        state.range[0] === min &&
-        state.range[1] === max &&
-        state.activeMode === null &&
-        state.activeFilter === null
-          ? null
-          : {
-              range: [min, max],
-              activeMode: null,
-              activeFilter: null,
-            }
-      );
+      setRange((prev) => (prev[0] === min && prev[1] === max ? prev : [min, max]));
+      setActiveMode((prev) => (prev === null ? prev : null));
+      setActiveFilter((prev) => (prev === null ? prev : null));
       return;
     }
     const clampedFrom = Math.max(parsedFilter.fromYear, min);
@@ -175,37 +139,71 @@ class RangeFacet extends Component {
       max,
       rangeSeparator
     );
-    const activeMode = defaultLabel ? RANGE_MODES.DEFAULT : RANGE_MODES.CUSTOM;
-    this.setState((state) =>
-      state.range[0] === from &&
-      state.range[1] === to &&
-      state.activeMode === activeMode &&
-      state.activeFilter === normalizedFilterValue
-        ? null
-        : {
-            range: [from, to],
-            activeMode,
-            activeFilter: normalizedFilterValue,
-          }
+    const newActiveMode = defaultLabel ? RANGE_MODES.DEFAULT : RANGE_MODES.CUSTOM;
+    setRange((prev) => (prev[0] === from && prev[1] === to ? prev : [from, to]));
+    setActiveMode((prev) => (prev === newActiveMode ? prev : newActiveMode));
+    setActiveFilter((prev) =>
+      prev === normalizedFilterValue ? prev : normalizedFilterValue
     );
   };
 
-  onRangeChange = (newRange, dateRangeString = null) => {
+  // componentDidMount equivalent
+  useEffect(() => {
+    syncStateWithFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // componentDidUpdate equivalent
+  const prevFiltersRef = useRef(currentQueryState.filters);
+  const prevAggNameRef = useRef(agg.aggName);
+  const prevDefaultRangesRef = useRef(defaultRanges);
+  const prevEnableCustomRangeRef = useRef(enableCustomRange);
+  const prevRangeSeparatorRef = useRef(rangeSeparator);
+  const prevResultsStateRef = useRef(currentResultsState);
+
+  useEffect(() => {
+    if (
+      prevFiltersRef.current !== currentQueryState.filters ||
+      prevAggNameRef.current !== agg.aggName ||
+      prevDefaultRangesRef.current !== defaultRanges ||
+      prevEnableCustomRangeRef.current !== enableCustomRange ||
+      prevRangeSeparatorRef.current !== rangeSeparator ||
+      prevResultsStateRef.current !== currentResultsState
+    ) {
+      syncStateWithFilters();
+    }
+    prevFiltersRef.current = currentQueryState.filters;
+    prevAggNameRef.current = agg.aggName;
+    prevDefaultRangesRef.current = defaultRanges;
+    prevEnableCustomRangeRef.current = enableCustomRange;
+    prevRangeSeparatorRef.current = rangeSeparator;
+    prevResultsStateRef.current = currentResultsState;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentQueryState,
+    agg,
+    defaultRanges,
+    enableCustomRange,
+    rangeSeparator,
+    currentResultsState,
+  ]);
+
+  const onRangeChange = (newRange, dateRangeString = null) => {
     const sorted = [...newRange].sort((a, b) => a - b);
-    this.setState({ range: sorted });
-    this.debouncedUpdateQuery(sorted, dateRangeString);
+    setRange(sorted);
+    debouncedUpdateQuery(sorted, dateRangeString);
   };
 
-  onBarClick = (year) => {
-    this.setState({ activeMode: null });
-    this.onRangeChange([year, year]);
+  const onBarClick = (year) => {
+    setActiveMode(null);
+    onRangeChange([year, year]);
   };
 
-  clearRangeFilter = () => {
-    const { agg, currentQueryState, updateQueryState } = this.props;
-    const { min, max } = this.getMinMax();
+  const clearRangeFilter = () => {
+    const { min, max } = getMinMax();
 
-    this.setState({ range: [min, max], activeFilter: null });
+    setRange([min, max]);
+    setActiveFilter(null);
 
     const filters = (currentQueryState.filters || []).filter(
       (f) => Array.isArray(f) && f[0] !== agg.aggName
@@ -217,113 +215,97 @@ class RangeFacet extends Component {
     });
   };
 
-  onApply = (activeMode, newRange, dateRangeString) => {
-    const { rangeSeparator } = this.props;
+  const handleApply = (newActiveMode, newRange, dateRangeString) => {
     const [from, to] = [...newRange].sort((a, b) => a - b);
-    const activeFilter = dateRangeString || `${from}${rangeSeparator}${to}`;
-    this.setState({ activeMode, activeFilter });
-    this.onRangeChange(newRange, dateRangeString);
+    const newActiveFilter = dateRangeString || `${from}${rangeSeparator}${to}`;
+    setActiveMode(newActiveMode);
+    setActiveFilter(newActiveFilter);
+    onRangeChange(newRange, dateRangeString);
   };
 
-  onClear = () => {
-    this.setState({ activeMode: null, activeFilter: null });
-    this.clearRangeFilter();
+  const onClear = () => {
+    setActiveMode(null);
+    setActiveFilter(null);
+    clearRangeFilter();
   };
 
-  onCustomActivate = () => {
-    this.setState({ activeMode: RANGE_MODES.CUSTOM, activeFilter: null });
+  const onCustomActivate = () => {
+    setActiveMode(RANGE_MODES.CUSTOM);
+    setActiveFilter(null);
   };
 
-  render() {
-    const {
-      title,
-      defaultRanges = DEFAULT_RANGES,
-      enableCustomRange = false,
-      rangeSeparator,
-      currentQueryState,
-      agg,
-      overridableId = "",
-      histogramHeight = 100,
-      dateRangeToLabel = i18next.t("to"),
-      fromAriaLabel,
-      toAriaLabel,
-      applyAriaLabel,
-      customRangeAriaLabel,
-    } = this.props;
-    const { range, activeMode, activeFilter } = this.state;
-    const { min, max } = this.getMinMax();
-    const buckets = this.getBuckets();
-    const data = getHistogramData(buckets, min, max);
-    const hasActiveFilter = (currentQueryState?.filters || []).some(
-      (f) => Array.isArray(f) && f[0] === agg.aggName
-    );
+  const { min, max } = getMinMax();
+  const buckets = getBuckets();
+  const data = getHistogramData(buckets, min, max);
+  const hasActiveFilter = (currentQueryState?.filters || []).some(
+    (f) => Array.isArray(f) && f[0] === agg.aggName
+  );
 
-    const hasResults = data.some((d) => d.count > 0);
-    if (!data.length || !hasResults) return null;
-    const containerCmp = (
-      <>
-        <RangeHistogram
-          data={data}
-          range={range}
-          height={histogramHeight}
-          onBarClick={this.onBarClick}
-          overridableId={overridableId}
-        />
-        <RangeSlider
-          min={min}
-          max={max}
-          value={range}
-          onChange={(r) => this.onApply(null, r, null)}
-          overridableId={overridableId}
-        />
-        {(defaultRanges || enableCustomRange) && (
-          <List>
-            {defaultRanges && (
-              <RangeDefaultFilters
-                ranges={defaultRanges}
-                min={min}
-                max={max}
-                rangeSeparator={rangeSeparator}
-                activeFilter={activeFilter}
-                activeMode={activeMode}
-                onSelect={(r, s) => this.onApply(RANGE_MODES.DEFAULT, r, s)}
-                onClear={this.onClear}
-                overridableId={overridableId}
-              />
-            )}
-            {enableCustomRange && (
-              <RangeCustomFilter
-                min={min}
-                max={max}
-                value={range}
-                rangeSeparator={rangeSeparator}
-                activeMode={activeMode}
-                activeFilter={activeFilter}
-                onApply={(r, s) => this.onApply(RANGE_MODES.CUSTOM, r, s)}
-                onClear={this.onClear}
-                onActivate={this.onCustomActivate}
-                overridableId={overridableId}
-                dateRangeToLabel={dateRangeToLabel}
-                fromAriaLabel={fromAriaLabel}
-                toAriaLabel={toAriaLabel}
-                applyAriaLabel={applyAriaLabel}
-                customRangeAriaLabel={customRangeAriaLabel}
-              />
-            )}
-          </List>
-        )}
-      </>
-    );
-    return (
-      <RangeFacetElement
-        title={title}
-        containerCmp={containerCmp}
-        hasActiveFilter={hasActiveFilter}
-        onClear={this.onClear}
+  const hasResults = data.some((d) => d.count > 0);
+  if (!data.length || !hasResults) return null;
+  const containerCmp = (
+    <>
+      <RangeHistogram
+        data={data}
+        range={range}
+        height={histogramHeight}
+        onBarClick={onBarClick}
         overridableId={overridableId}
       />
-    );
-  }
+      <RangeSlider
+        min={min}
+        max={max}
+        value={range}
+        onChange={(r) => handleApply(null, r, null)}
+        overridableId={overridableId}
+      />
+      {(defaultRanges || enableCustomRange) && (
+        <List>
+          {defaultRanges && (
+            <RangeDefaultFilters
+              ranges={defaultRanges}
+              min={min}
+              max={max}
+              rangeSeparator={rangeSeparator}
+              activeFilter={activeFilter}
+              activeMode={activeMode}
+              onSelect={(r, s) => handleApply(RANGE_MODES.DEFAULT, r, s)}
+              onClear={onClear}
+              overridableId={overridableId}
+            />
+          )}
+          {enableCustomRange && (
+            <RangeCustomFilter
+              min={min}
+              max={max}
+              value={range}
+              rangeSeparator={rangeSeparator}
+              activeMode={activeMode}
+              activeFilter={activeFilter}
+              onApply={(r, s) => handleApply(RANGE_MODES.CUSTOM, r, s)}
+              onClear={onClear}
+              onActivate={onCustomActivate}
+              overridableId={overridableId}
+              dateRangeToLabel={dateRangeToLabel}
+              fromAriaLabel={fromAriaLabel}
+              toAriaLabel={toAriaLabel}
+              applyAriaLabel={applyAriaLabel}
+              customRangeAriaLabel={customRangeAriaLabel}
+            />
+          )}
+        </List>
+      )}
+    </>
+  );
+  return (
+    <RangeFacetElement
+      title={title}
+      containerCmp={containerCmp}
+      hasActiveFilter={hasActiveFilter}
+      onClear={onClear}
+      overridableId={overridableId}
+    />
+  );
 }
 
 RangeFacet.propTypes = {
@@ -357,8 +339,6 @@ RangeFacet.propTypes = {
   applyAriaLabel: PropTypes.string,
   customRangeAriaLabel: PropTypes.string,
 };
-
-RangeFacet.contextType = AppContext;
 
 export default Overridable.component("RangeFacet", withState(RangeFacet));
 
